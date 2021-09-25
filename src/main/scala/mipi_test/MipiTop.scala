@@ -212,7 +212,7 @@ class MipiTop(mipiHRes: Int = 1920, mipiVRes: Int = 1080) extends MultiIOModule 
   val txVideoData = buffer.io.dataOut.bits
   buffer.io.dataOut.ready := txVideoValid
 
-  /////////////////////////// txVSync ???
+  /////////////////////////// txVSync
 
   mipi.inst2V.DATA  := txVideoData
   mipi.inst2V.HSYNC := txHSync
