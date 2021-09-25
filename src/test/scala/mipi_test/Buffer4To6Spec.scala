@@ -31,42 +31,36 @@ class Buffer4To6Spec extends FlatSpec with ChiselScalatestTester {
             (inputSampleList(4 * i + 3) << (3 * raw10BitWidth))
         }
 
-      println(inputSampleList)
-      println(inputDataList)
       val outputDataList: scala.collection.mutable.Buffer[Long] =
         scala.collection.mutable.Buffer()
 
       for (i <- inputDataList) {
 
-        dut.io.dataIn.poke(i.U)
-        dut.io.validIn.poke(true.B)
+        dut.io.dataIn.bits.poke(i.U)
+        dut.io.dataIn.valid.poke(true.B)
 
 
         dut.clock.step(1)
 
-        println(dut.io.validOut.peek)
-        if(dut.io.validOut.peek.litToBoolean) {
-          outputDataList += dut.io.dataOut.peek.litValue.toLong
-          println(dut.io.dataOut.peek)
+        if(dut.io.dataOut.valid.peek.litToBoolean) {
+          outputDataList += dut.io.dataOut.bits.peek.litValue.toLong
         }
 
         if(rand.nextBoolean) {
-          dut.io.dataIn.poke((rand.nextLong.abs/4).U)
-          dut.io.validIn.poke(false.B)
+          dut.io.dataIn.bits.poke((rand.nextLong.abs/4).U)
+          dut.io.dataIn.valid.poke(false.B)
           dut.clock.step(rand.nextInt(5) + 1)
         }
-        dut.io.validIn.poke(false.B)
+        dut.io.dataIn.valid.poke(false.B)
       }
 
-      println(outputDataList)
 
       for (i <- 1 to 10) {
-        dut.io.dataIn.poke(0.U)
-        dut.io.validIn.poke(false.B)
+        dut.io.dataIn.bits.poke(0.U)
+        dut.io.dataIn.valid.poke(false.B)
         dut.clock.step(1)
-        if(dut.io.validOut.peek == true.B) {
-          outputDataList += dut.io.dataOut.peek.toString.toLong
-          println(dut.io.dataOut.peek)
+        if(dut.io.dataOut.valid.peek == true.B) {
+          outputDataList += dut.io.dataOut.bits.peek.toString.toLong
         }
       }
 
@@ -77,8 +71,6 @@ class Buffer4To6Spec extends FlatSpec with ChiselScalatestTester {
         }
       }
 
-      println(inputSampleList)
-      println(outputSampleList)
       assert(inputSampleList == outputSampleList)
     }
   }

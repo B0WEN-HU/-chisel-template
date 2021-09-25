@@ -62,7 +62,7 @@ class DecoupledGcd(width: Int) extends MultiIOModule {
     }
   }.otherwise {
     when(input.valid) {
-      val bundle = input.deq()
+      val bundle = input.bits //input.deq()
       x := bundle.value1
       y := bundle.value2
       xInitial := bundle.value1

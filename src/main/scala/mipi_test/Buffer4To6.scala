@@ -1,16 +1,17 @@
 //Buffer from 4 to 6 pixels a data
+
 package mipi_test
 
 import chisel3.util._
 import chisel3._
 
 class Buffer4To6 extends Module {
-  val io = IO(new Bundle{
+  val io = IO(new Bundle {
     val clear     = Input(Bool())
-    val dataIn    = Input(UInt(64.W))
-    val validIn   = Input(Bool())
-    val dataOut   = Output(UInt(64.W))
-    val validOut  = Output(Bool())
+    val dataIn    = Flipped(ValidIO(UInt(64.W)))
+    //val validIn   = Input(Bool())
+    val dataOut   = ValidIO(UInt(64.W))
+    //val validOut  = Output(Bool())
   })
 
   val raw10BitWidth = 10
@@ -39,16 +40,16 @@ class Buffer4To6 extends Module {
     inputPtr  := 0.U
     outputPtr := 0.U
   } .otherwise {
-    when(io.validIn) {
+    when(io.dataIn.valid) {
       inputPtr := nextInputPtr
       when(nextInputPtr === 1.U) {
-        inputSampleReg1 := io.dataIn(4 * raw10BitWidth - 1, 0)
+        inputSampleReg1 := io.dataIn.bits(4 * raw10BitWidth - 1, 0)
       }
       when(nextInputPtr === 2.U) {
-        inputSampleReg2 := io.dataIn(4 * raw10BitWidth - 1, 0)
+        inputSampleReg2 := io.dataIn.bits(4 * raw10BitWidth - 1, 0)
       }
       when(nextInputPtr === 3.U) {
-        inputSampleReg3 := io.dataIn(4 * raw10BitWidth - 1, 0)
+        inputSampleReg3 := io.dataIn.bits(4 * raw10BitWidth - 1, 0)
       }
     }
     when(outputValid) {
@@ -59,6 +60,6 @@ class Buffer4To6 extends Module {
   val outputSample =
     Mux(inputPtr === 2.U, outputSample1, outputSample2)
 
-  io.dataOut  := outputSample
-  io.validOut := outputValid
+  io.dataOut.bits  := outputSample
+  io.dataOut.valid := outputValid
 }
