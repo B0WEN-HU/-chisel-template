@@ -89,6 +89,32 @@ class MipiTop(mipiHRes: Int = 1920, mipiVRes: Int = 1080) extends MultiIOModule 
     pulseDelayed
   }
 
+  def delayPulse(pulse: Bool, cycles: UInt): Bool = {
+    val counter = Reg(UInt(log2Ceil(mipiHRes * 2).W))
+    val enable  = RegInit(false.B)
+
+    val pulseDelayed = RegInit(false.B)
+
+    when(pulse) {
+      enable  := true.B
+      counter := 0.U
+
+      pulseDelayed := false.B
+    }.elsewhen(counter === (cycles - 2.U)) {
+      enable  := false.B
+      counter := 0.U
+
+      pulseDelayed   := true.B
+    }.elsewhen(enable) {
+      counter := counter + 1.U
+      pulseDelayed := false.B
+    }.otherwise {
+      pulseDelayed := false.B
+    }
+
+    pulseDelayed
+  }
+
   // Pixel counter
   val rxHCnt = RegInit(0.U(log2Ceil(mipiHRes).W))
   val rxVCnt = RegInit(0.U(log2Ceil(mipiVRes).W))
@@ -132,7 +158,7 @@ class MipiTop(mipiHRes: Int = 1920, mipiVRes: Int = 1080) extends MultiIOModule 
 
   // line buffer
   val adaptor = Module(new Buffer4To6)
-  val buffer  = Module(new LineBuffer(mipiHRes))
+  val buffer  = Module(new LineBuffer(mipiHRes * 2))
 
   adaptor.io.clear := rxHSyncPosedge
   adaptor.io.dataIn.valid := rxVideoValid
@@ -146,11 +172,11 @@ class MipiTop(mipiHRes: Int = 1920, mipiVRes: Int = 1080) extends MultiIOModule 
 
   // RX Video
   rxHCnt :=
-    Mux(!rxHSync,
+    Mux(rxHSyncPosedge,
       0.U,
       Mux(rxVideoValid, rxHCnt + 4.U, rxHCnt))  // RAW10 Input 4 pixels per DATA
   rxVCnt :=
-    Mux(!rxVSync,
+    Mux(rxVSyncPosedge,
       0.U,
       Mux(rxHSyncNegedge, rxVCnt + 1.U, rxVCnt))
 
@@ -159,24 +185,29 @@ class MipiTop(mipiHRes: Int = 1920, mipiVRes: Int = 1080) extends MultiIOModule 
 
   // TX Video
   val txHStart = rxHSyncNegedge
-  val txHEnd   = txHCnt >= mipiHRes.U || !buffer.io.dataOut.valid
+  val rxHMax   = RegEnable(Mux(mipiHRes.U > rxHCnt, mipiHRes.U, rxHCnt), txHStart)
+  val txHEnd   = txHCnt >= rxHMax //|| !buffer.io.dataOut.valid
   val txVStart = rxVSyncPosedge
   val txHSync  = RegInit(false.B)
   val txVSync  = RegInit(false.B)
   val txVideoValid = RegInit(false.B)
 
-  txHCnt :=
-    Mux(txVideoValid, txHCnt + 1.U, 0.U)
+  txHCnt := //Mux(txHStart, 0.U, Mux(txVideoValid, txHCnt + 6.U, txHCnt))
+    Mux(txVideoValid, txHCnt + 6.U, 0.U)
   txVCnt :=
     Mux(rxVSyncPosedge, 0.U, Mux(txHStart, txVCnt + 1.U, txVCnt))
 
   txHSync :=
-    Mux(txHStart, true.B, Mux(ShiftRegister(txHEnd, 2), false.B, txHSync))
+    Mux(txHStart, true.B, Mux(delayPulse(txHEnd, 3), false.B, txHSync))
   txVideoValid :=
-    Mux(ShiftRegister(txHStart, 2), true.B, Mux(txHEnd, false.B, txVideoValid))
+    Mux(delayPulse(txHStart, 3), true.B, Mux(txHEnd, false.B, txVideoValid))
 
   txVSync :=
-    Mux(rxVSyncPosedge, true.B, Mux(delayPulse(rxVSyncNegedge, 1920 + 4), false.B, txVSync))
+    Mux(
+      delayPulse(rxVSyncPosedge, rxHMax + 4.U), true.B,
+      Mux(
+        delayPulse(rxVSyncNegedge, rxHMax + 4.U), false.B,
+        txVSync))
 
   val txVideoData = buffer.io.dataOut.bits
   buffer.io.dataOut.ready := txVideoValid
